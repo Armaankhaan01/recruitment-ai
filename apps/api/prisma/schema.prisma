@@ -1,0 +1,208 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  RECRUITER
+  HIRING_MANAGER
+}
+
+enum JobStatus {
+  DRAFT
+  OPEN
+  ON_HOLD
+  CLOSED
+  ARCHIVED
+}
+
+enum SeniorityLevel {
+  JUNIOR
+  MID
+  SENIOR
+  LEAD
+  PRINCIPAL
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  PROCESSING
+  SCORING
+  REVIEWED
+  SHORTLISTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum DecisionType {
+  ADVANCE
+  REJECT
+  DEFER
+  SHORTLIST
+  WITHDRAW
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @db.VarChar(255)
+  fullName     String    @db.VarChar(150)
+  role         UserRole  @default(RECRUITER)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  lastLoginAt  DateTime? @db.Timestamptz(6)
+
+  teamId       String?   @db.Uuid
+  team         Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  jobs      Job[]               @relation("CreatedJobs")
+  decisions RecruiterDecision[]
+
+  @@map("users")
+}
+
+model Team {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String   @db.VarChar(150)
+  inviteCode String   @unique @db.VarChar(50)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  users User[]
+  jobs  Job[]
+
+  @@map("teams")
+}
+
+model Job {
+  id                 String         @id @default(uuid()) @db.Uuid
+  createdById        String         @db.Uuid
+  teamId             String?        @db.Uuid
+  title              String         @db.VarChar(200)
+  description        String         @db.Text
+  skillRequirements  Json           @default("[]") @db.JsonB
+  minExperienceYears Int            @default(0)
+  seniorityLevel     SeniorityLevel @default(MID)
+  salaryRangeMin     Decimal?       @db.Decimal(10,2)
+  salaryRangeMax     Decimal?       @db.Decimal(10,2)
+  status             JobStatus      @default(DRAFT)
+  publishedAt        DateTime?      @db.Timestamptz(6)
+  closedAt           DateTime?      @db.Timestamptz(6)
+  createdAt          DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime       @updatedAt @db.Timestamptz(6)
+
+  createdBy    User          @relation("CreatedJobs", fields:[createdById], references:[id])
+  team         Team?         @relation(fields:[teamId], references:[id], onDelete: SetNull)
+  applications Application[]
+
+  @@index([status, seniorityLevel])
+  @@index([createdAt(sort: Desc)])
+  @@map("jobs")
+}
+
+model Candidate {
+  id                   String          @id @default(uuid()) @db.Uuid
+  fullName             String          @db.VarChar(150)
+  email                String          @db.VarChar(255)
+  phone                String?         @db.VarChar(30)
+  location             String?         @db.VarChar(150)
+  extractedSkills      Json            @default("[]") @db.JsonB
+  totalExperienceYears Decimal?        @db.Decimal(4,1)
+  education            Json            @default("[]") @db.JsonB
+  employmentHistory    Json            @default("[]") @db.JsonB
+  seniorityInferred    SeniorityLevel?
+  rawResumeText        String?         @db.Text
+  resumeFilePath       String          @db.VarChar(500)
+  resumeFileType       String          @db.VarChar(10)
+  parseModelVersion    String?         @db.VarChar(50)
+  createdAt            DateTime        @default(now()) @db.Timestamptz(6)
+
+  applications Application[]
+
+  @@index([seniorityInferred])
+  @@map("candidates")
+}
+
+model Application {
+  id                    String            @id @default(uuid()) @db.Uuid
+  candidateId           String            @db.Uuid
+  jobId                 String            @db.Uuid
+  appliedAt             DateTime          @default(now()) @db.Timestamptz(6)
+  status                ApplicationStatus @default(SUBMITTED)
+  aiCompatibilityScore  Decimal?          @db.Decimal(5,2)
+  aiScoreRationale      String?           @db.Text
+  processingStartedAt   DateTime?         @db.Timestamptz(6)
+  processingCompletedAt DateTime?         @db.Timestamptz(6)
+  processingError       String?           @db.Text
+  retryCount            Int               @default(0)
+  sourceChannel         String            @default("direct_portal") @db.VarChar(100)
+  createdAt             DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime          @updatedAt @db.Timestamptz(6)
+
+  candidate       Candidate          @relation(fields:[candidateId], references:[id], onDelete: Cascade)
+  job             Job                @relation(fields:[jobId], references:[id])
+  screeningResult AIScreeningResult?
+  decisions       RecruiterDecision[]
+
+  @@unique([candidateId, jobId])
+  @@index([jobId, aiCompatibilityScore(sort: Desc)])
+  @@index([jobId, status])
+  @@index([status])
+  @@index([appliedAt(sort: Desc)])
+  @@map("applications")
+}
+
+model AIScreeningResult {
+  id                 String   @id @default(uuid()) @db.Uuid
+  applicationId      String   @unique @db.Uuid
+  summaryText        String   @db.Text
+  strengths          Json     @default("[]") @db.JsonB
+  gaps               Json     @default("[]") @db.JsonB
+  interviewFocusAreas Json    @default("[]") @db.JsonB
+  modelVersion       String   @db.VarChar(50)
+  promptVersion      String   @default("v1.0") @db.VarChar(20)
+  inputTokenCount    Int?
+  outputTokenCount   Int?
+  generatedAt        DateTime @default(now()) @db.Timestamptz(6)
+  isSuperseded       Boolean  @default(false)
+
+  application Application @relation(fields:[applicationId], references:[id], onDelete: Cascade)
+
+  @@index([applicationId, generatedAt(sort: Desc)])
+  @@map("ai_screening_results")
+}
+
+model RecruiterDecision {
+  id             String            @id @default(uuid()) @db.Uuid
+  applicationId  String            @db.Uuid
+  decidedById    String            @db.Uuid
+  decisionType   DecisionType
+  rationale      String            @db.Text
+  previousStatus ApplicationStatus
+  newStatus      ApplicationStatus
+  decidedAt      DateTime          @default(now()) @db.Timestamptz(6)
+
+  application Application @relation(fields:[applicationId], references:[id], onDelete: Cascade)
+  decidedBy   User        @relation(fields:[decidedById], references:[id])
+
+  @@index([applicationId, decidedAt(sort: Desc)])
+  @@map("recruiter_decisions")
+}
+
+model EventLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  eventType  String   @db.VarChar(100)
+  entityType String   @db.VarChar(50)
+  entityId   String   @db.Uuid
+  actorId    String?  @db.Uuid
+  payload    Json     @default("{}") @db.JsonB
+  occurredAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([entityType, entityId, occurredAt(sort: Desc)])
+  @@index([eventType, occurredAt(sort: Desc)])
+  @@map("event_log")
+}
