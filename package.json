@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "packageManager": "pnpm@9.15.0",
+  "packageManager": "pnpm@11.1.2",
   "scripts": {
     "dev": "concurrently \"pnpm --filter api dev\" \"pnpm --filter web dev\"",
     "dev:api": "pnpm --filter api dev",
@@ -14,13 +14,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "devEngines": {
-    "packageManager": {
-      "name": "pnpm",
-      "version": "^11.1.2",
-      "onFail": "download"
-    }
-  },
   "devDependencies": {
     "concurrently": "^9.1.0"
   },
