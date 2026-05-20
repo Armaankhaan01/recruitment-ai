@@ -1,29 +1,50 @@
 import { Router } from "express";
 import prisma from "../db/prisma";
-import { authenticate } from "../middleware/authenticate";
+import { authenticate, AuthRequest } from "../middleware/authenticate";
 
 const router: Router = Router();
 
 // GET /metrics/overview
-router.get("/overview", authenticate, async (req, res, next) => {
+router.get("/overview", authenticate, async (req: AuthRequest, res, next) => {
   try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
+    if (!user || !user.teamId) {
+      return res.status(403).json({ error: { code: "NO_TEAM", message: "You must belong to a team to view metrics." } });
+    }
+    const teamId = user.teamId;
+
     const from = req.query.from ? new Date(req.query.from as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const to = req.query.to ? new Date(req.query.to as string) : new Date();
 
-    const [totalJobs, totalApplications, avgAiScore, totalShortlisted] = await prisma.$transaction([
-      prisma.job.count({ where: { status: "OPEN" } }),
-      prisma.application.count({ where: { appliedAt: { gte: from, lte: to } } }),
+    const [totalJobs, totalApplications, avgAiScore, totalShortlisted, closedJobs] = await prisma.$transaction([
+      prisma.job.count({ where: { teamId, status: "OPEN" } }),
+      prisma.application.count({ where: { job: { teamId }, appliedAt: { gte: from, lte: to } } }),
       prisma.application.aggregate({
-        where: { status: "REVIEWED", processingCompletedAt: { gte: from, lte: to } },
+        where: { job: { teamId }, status: "REVIEWED", processingCompletedAt: { gte: from, lte: to } },
         _avg: { aiCompatibilityScore: true },
       }),
-      prisma.application.count({ where: { status: "SHORTLISTED" } }),
+      prisma.application.count({ where: { job: { teamId }, status: "SHORTLISTED" } }),
+      prisma.job.findMany({
+        where: { teamId, status: "CLOSED", publishedAt: { not: null }, closedAt: { not: null } },
+        select: { publishedAt: true, closedAt: true },
+      }),
     ]);
+
+    let avgTimeToFillDays = 0;
+    if (closedJobs.length > 0) {
+      const totalDays = closedJobs.reduce((sum, job) => {
+        const published = job.publishedAt!;
+        const closed = job.closedAt!;
+        const diffMs = closed.getTime() - published.getTime();
+        return sum + (diffMs / (1000 * 60 * 60 * 24));
+      }, 0);
+      avgTimeToFillDays = Math.round(totalDays / closedJobs.length);
+    }
 
     res.json({
       totalJobs,
       totalApplications,
-      avgTimeToFillDays: 0,
+      avgTimeToFillDays,
       avgAiScore: Number(avgAiScore._avg?.aiCompatibilityScore ?? 0).toFixed(1),
       totalShortlisted,
     });
@@ -33,10 +54,16 @@ router.get("/overview", authenticate, async (req, res, next) => {
 });
 
 // GET /metrics/time-to-fill
-router.get("/time-to-fill", authenticate, async (req, res, next) => {
+router.get("/time-to-fill", authenticate, async (req: AuthRequest, res, next) => {
   try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
+    if (!user || !user.teamId) {
+      return res.status(403).json({ error: { code: "NO_TEAM", message: "You must belong to a team to view metrics." } });
+    }
+    const teamId = user.teamId;
+
     const jobs = await prisma.job.findMany({
-      where: { status: "CLOSED" },
+      where: { teamId, status: "CLOSED" },
       select: {
         id: true,
         title: true,
@@ -59,10 +86,17 @@ router.get("/time-to-fill", authenticate, async (req, res, next) => {
 });
 
 // GET /metrics/conversion
-router.get("/conversion", authenticate, async (req, res, next) => {
+router.get("/conversion", authenticate, async (req: AuthRequest, res, next) => {
   try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
+    if (!user || !user.teamId) {
+      return res.status(403).json({ error: { code: "NO_TEAM", message: "You must belong to a team to view metrics." } });
+    }
+    const teamId = user.teamId;
+
     const groups = await prisma.application.groupBy({
       by: ["status"],
+      where: { job: { teamId } },
       _count: { status: true },
     });
 
@@ -80,10 +114,24 @@ router.get("/conversion", authenticate, async (req, res, next) => {
 });
 
 // GET /metrics/score-distribution
-router.get("/score-distribution", authenticate, async (req, res, next) => {
+router.get("/score-distribution", authenticate, async (req: AuthRequest, res, next) => {
   try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
+    if (!user || !user.teamId) {
+      return res.status(403).json({ error: { code: "NO_TEAM", message: "You must belong to a team to view metrics." } });
+    }
+    const teamId = user.teamId;
+
     const jobId = req.query.jobId as string | undefined;
-    const where = jobId ? { jobId } : {};
+
+    if (jobId) {
+      const job = await prisma.job.findUnique({ where: { id: jobId } });
+      if (!job || job.teamId !== teamId) {
+        return res.status(403).json({ error: { code: "ACCESS_DENIED", message: "Job not found or access denied." } });
+      }
+    }
+
+    const where: any = jobId ? { jobId } : { job: { teamId } };
 
     const apps = await prisma.application.findMany({
       where: { ...where, aiCompatibilityScore: { not: null } },
@@ -131,17 +179,24 @@ router.get("/score-distribution", authenticate, async (req, res, next) => {
 });
 
 // GET /metrics/source-effectiveness
-router.get("/source-effectiveness", authenticate, async (req, res, next) => {
+router.get("/source-effectiveness", authenticate, async (req: AuthRequest, res, next) => {
   try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
+    if (!user || !user.teamId) {
+      return res.status(403).json({ error: { code: "NO_TEAM", message: "You must belong to a team to view metrics." } });
+    }
+    const teamId = user.teamId;
+
     const groups = await prisma.application.groupBy({
       by: ["sourceChannel"],
+      where: { job: { teamId } },
       _count: { sourceChannel: true },
     });
 
     const data = await Promise.all(
       groups.map(async (g) => {
         const shortlisted = await prisma.application.count({
-          where: { sourceChannel: g.sourceChannel, status: "SHORTLISTED" },
+          where: { job: { teamId }, sourceChannel: g.sourceChannel, status: "SHORTLISTED" },
         });
         return {
           sourceChannel: g.sourceChannel,
