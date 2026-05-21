@@ -32,7 +32,7 @@ router.get("/overview", authenticate, async (req: AuthRequest, res, next) => {
 
     let avgTimeToFillDays = 0;
     if (closedJobs.length > 0) {
-      const totalDays = closedJobs.reduce((sum, job) => {
+      const totalDays = closedJobs.reduce((sum: number, job: any) => {
         const published = job.publishedAt!;
         const closed = job.closedAt!;
         const diffMs = closed.getTime() - published.getTime();
@@ -72,7 +72,7 @@ router.get("/time-to-fill", authenticate, async (req: AuthRequest, res, next) =>
       },
     });
 
-    const data = jobs.map((job) => ({
+    const data = jobs.map((job: any) => ({
       jobId: job.id,
       title: job.title,
       daysOpen: job.publishedAt && job.closedAt ? Math.round((job.closedAt.getTime() - job.publishedAt.getTime()) / (1000 * 60 * 60 * 24)) : null,
@@ -100,8 +100,8 @@ router.get("/conversion", authenticate, async (req: AuthRequest, res, next) => {
       _count: { status: true },
     });
 
-    const total = groups.reduce((sum, g) => sum + g._count.status, 0);
-    const data = groups.map((g) => ({
+    const total = groups.reduce((sum: number, g: any) => sum + g._count.status, 0);
+    const data = groups.map((g: any) => ({
       stage: g.status,
       count: g._count.status,
       conversionRate: total > 0 ? g._count.status / total : 0,
@@ -151,15 +151,15 @@ router.get("/score-distribution", authenticate, async (req: AuthRequest, res, ne
       { range: "91-100", count: 0 },
     ];
 
-    const scores = apps.map((a) => Number(a.aiCompatibilityScore ?? 0));
+    const scores = apps.map((a: any) => Number(a.aiCompatibilityScore ?? 0));
 
-    scores.forEach((s) => {
+    scores.forEach((s: number) => {
       const idx = Math.min(Math.floor(s / 10), 9);
       const bucket = buckets[idx];
       if (idx >= 0 && bucket) bucket.count++;
     });
 
-    const mean = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+    const mean = scores.length > 0 ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : 0;
     const sorted = [...scores].sort((a, b) => a - b);
     let median = 0;
     if (sorted.length > 0) {
@@ -194,7 +194,7 @@ router.get("/source-effectiveness", authenticate, async (req: AuthRequest, res, 
     });
 
     const data = await Promise.all(
-      groups.map(async (g) => {
+      groups.map(async (g: any) => {
         const shortlisted = await prisma.application.count({
           where: { job: { teamId }, sourceChannel: g.sourceChannel, status: "SHORTLISTED" },
         });

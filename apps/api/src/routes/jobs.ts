@@ -145,7 +145,7 @@ router.get("/:id", authenticate, validate(jobIdSchema, "params"), async (req: Au
     ]);
 
     const stageMap: Record<string, number> = {};
-    stageCounts.forEach((s) => { stageMap[s.status] = (s._count as any).status; });
+    stageCounts.forEach((s: any) => { stageMap[s.status] = (s._count as any).status; });
 
     res.json({ job, applicationCount, stageCounts: stageMap });
   } catch {

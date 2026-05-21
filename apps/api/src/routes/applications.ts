@@ -89,7 +89,7 @@ router.post("/", upload.single("resume"), async (req, res, next) => {
     }
 
     try {
-      const { candidate, application } = await prisma.$transaction(async (tx) => {
+      const { candidate, application } = await prisma.$transaction(async (tx: any) => {
         let candidate = await tx.candidate.findFirst({
           where: { email },
         });

@@ -75,7 +75,7 @@ router.get("/:id", authenticate, validate(candidateIdSchema, "params"), async (r
       return res.status(404).json({ error: { code: "NOT_FOUND", message: "Candidate not found" } });
     }
 
-    const applications = candidate.applications.map((app) => ({
+    const applications = candidate.applications.map((app: any) => ({
       id: app.id,
       jobId: app.jobId,
       jobTitle: app.job.title,
