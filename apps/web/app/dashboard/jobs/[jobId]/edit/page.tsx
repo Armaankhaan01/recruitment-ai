@@ -24,6 +24,7 @@ export default function EditJobPage({ params }: { params: Promise<{ jobId: strin
   // Form Fields State
   const [title, setTitle] = useState("");
   const [seniority, setSeniority] = useState("MID");
+  const [location, setLocation] = useState("Remote");
   const [description, setDescription] = useState("");
   const [skills, setSkills] = useState<{ name: string; minYears: number; required: boolean }[]>([
     { name: "", minYears: 1, required: true }
@@ -37,6 +38,7 @@ export default function EditJobPage({ params }: { params: Promise<{ jobId: strin
         const job = data.job;
         setTitle(job.title || "");
         setSeniority(job.seniorityLevel || "MID");
+        setLocation(job.location || "Remote");
         setDescription(job.description || "");
         if (Array.isArray(job.skillRequirements) && job.skillRequirements.length > 0) {
           setSkills(job.skillRequirements);
@@ -88,15 +90,25 @@ export default function EditJobPage({ params }: { params: Promise<{ jobId: strin
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      const seniorityMap: Record<string, number> = {
+        JUNIOR: 1,
+        MID: 2,
+        SENIOR: 5,
+        LEAD: 8,
+        PRINCIPAL: 12
+      };
+
       await updateJob(jobId, {
         title: title.trim(),
         description: description.trim(),
+        location: location.trim() || "Remote",
         skillRequirements: skills.map(s => ({
           name: s.name.trim(),
           minYears: Number(s.minYears),
           required: s.required
         })),
         seniorityLevel: seniority,
+        minExperienceYears: seniorityMap[seniority] ?? 2,
         salaryRangeMin: salaryMin ? Number(salaryMin) : null,
         salaryRangeMax: salaryMax ? Number(salaryMax) : null,
       });
@@ -219,6 +231,16 @@ export default function EditJobPage({ params }: { params: Promise<{ jobId: strin
                     <SelectItem value="PRINCIPAL">Principal (&gt; 12 yrs)</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground uppercase tracking-wider">Location</label>
+                <Input 
+                  value={location} 
+                  onChange={(e) => setLocation(e.target.value)} 
+                  placeholder="e.g. Remote, Hybrid, San Francisco, CA"
+                  className="h-10 border-border/60 bg-background placeholder:text-muted-foreground/45"
+                />
               </div>
             </div>
           )}

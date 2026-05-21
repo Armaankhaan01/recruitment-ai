@@ -84,6 +84,7 @@ model Job {
   teamId             String?        @db.Uuid
   title              String         @db.VarChar(200)
   description        String         @db.Text
+  location           String         @default("Remote") @db.VarChar(100)
   skillRequirements  Json           @default("[]") @db.JsonB
   minExperienceYears Int            @default(0)
   seniorityLevel     SeniorityLevel @default(MID)

@@ -19,6 +19,7 @@ async function main() {
     {
       title: "Senior Frontend Engineer",
       description: "We are looking for a Senior Frontend Engineer with deep React and TypeScript experience to lead our web application team.",
+      location: "New York, NY (Hybrid)",
       skillRequirements: [
         { name: "React", minYears: 4, required: true },
         { name: "TypeScript", minYears: 3, required: true },
@@ -36,6 +37,7 @@ async function main() {
     {
       title: "Mid-Level Backend Developer",
       description: "Join our backend team to build scalable API services using Node.js, Express, and PostgreSQL.",
+      location: "Remote",
       skillRequirements: [
         { name: "Node.js", minYears: 3, required: true },
         { name: "PostgreSQL", minYears: 2, required: true },
@@ -51,6 +53,7 @@ async function main() {
     {
       title: "Principal Software Engineer",
       description: "Lead technical direction for our platform team, architecting solutions across microservices and cloud infrastructure.",
+      location: "San Francisco, CA",
       skillRequirements: [
         { name: "System Design", minYears: 5, required: true },
         { name: "Cloud (AWS/GCP)", minYears: 4, required: true },

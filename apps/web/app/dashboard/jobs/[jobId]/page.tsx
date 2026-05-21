@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, ArrowLeft, Edit3, Calendar, DollarSign, Layers, Award, Sparkles, Play, Pause, XCircle, Trash2, ArrowUpRight } from "lucide-react";
+import { Loader2, ArrowLeft, Edit3, Calendar, DollarSign, Layers, Award, Sparkles, Play, Pause, XCircle, Trash2, ArrowUpRight, MapPin } from "lucide-react";
 import JobStatusBadge from "@/components/recruitment/JobStatusBadge";
 import ApplicationStatusBadge from "@/components/recruitment/ApplicationStatusBadge";
 import ScoreBar from "@/components/recruitment/ScoreBar";
@@ -19,6 +19,7 @@ interface Job {
   id: string;
   title: string;
   description: string;
+  location?: string | null;
   status: string;
   seniorityLevel: string;
   skillRequirements: any;
@@ -135,6 +136,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ jobId: str
             </Badge>
             <Badge variant="outline" className="border-border/60 text-muted-foreground font-extrabold text-[10px] tracking-wider uppercase">
               Min Exp: {job.minExperienceYears} yrs
+            </Badge>
+            <Badge variant="outline" className="border-border/60 text-muted-foreground font-extrabold text-[10px] tracking-wider uppercase flex items-center gap-0.5">
+              <MapPin className="w-3 h-3 text-primary" />
+              Location: {job.location || "Remote"}
             </Badge>
             {job.salaryRangeMin && job.salaryRangeMax && (
               <Badge variant="outline" className="border-border/60 text-muted-foreground font-extrabold text-[10px] tracking-wider uppercase flex items-center gap-0.5">

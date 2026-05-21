@@ -11,6 +11,7 @@ const router: Router = Router();
 const createJobSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().min(100),
+  location: z.string().min(1).max(100).optional(),
   skillRequirements: z.array(z.object({
     name: z.string(),
     minYears: z.number().min(0),
@@ -21,6 +22,14 @@ const createJobSchema = z.object({
   salaryRangeMin: z.number().optional().nullable(),
   salaryRangeMax: z.number().optional().nullable(),
 });
+
+const seniorityExperienceMap: Record<string, number> = {
+  JUNIOR: 1,
+  MID: 2,
+  SENIOR: 5,
+  LEAD: 8,
+  PRINCIPAL: 12,
+};
 
 const jobIdSchema = z.object({ id: z.string().uuid() });
 
@@ -103,9 +112,15 @@ router.post("/", authenticate, requireRole("RECRUITER"), validate(createJobSchem
       return res.status(403).json({ error: { code: "NO_TEAM", message: "You must belong to a team to create job requisitions." } });
     }
 
+    const seniority = req.body.seniorityLevel || "MID";
+    const minExp = req.body.minExperienceYears !== undefined 
+      ? req.body.minExperienceYears 
+      : (seniorityExperienceMap[seniority] ?? 2);
+
     const job = await prisma.job.create({
       data: {
         ...req.body,
+        minExperienceYears: minExp,
         createdById: req.user!.sub,
         teamId: user.teamId,
         status: "DRAFT",
@@ -171,7 +186,12 @@ router.patch("/:id", authenticate, requireRole("RECRUITER"), validate(jobIdSchem
       return res.status(422).json({ error: { code: "INVALID_STATUS", message: "Invalid status transition" } });
     }
 
-    const updated = await prisma.job.update({ where: { id }, data: req.body });
+    const updateData = { ...req.body };
+    if (updateData.seniorityLevel && updateData.minExperienceYears === undefined) {
+      updateData.minExperienceYears = seniorityExperienceMap[updateData.seniorityLevel] ?? 2;
+    }
+
+    const updated = await prisma.job.update({ where: { id }, data: updateData });
 
     await logEvent("JOB_UPDATED", "JOB", id, req.user!.sub, {
       previousStatus: job.status,

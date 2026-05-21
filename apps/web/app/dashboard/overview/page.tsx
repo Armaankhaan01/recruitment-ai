@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import KPICard from "@/components/recruitment/KPICard";
 import ApplicationStatusBadge from "@/components/recruitment/ApplicationStatusBadge";
-import { getMetricsOverview, getScoreDistribution } from "@/lib/api/metrics";
+import { getMetricsOverview, getScoreDistribution, getConversion } from "@/lib/api/metrics";
 import { getApplications } from "@/lib/api/applications";
 import { me, createTeam, joinTeam } from "@/lib/api/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -52,6 +52,7 @@ export default function OverviewPage() {
   const [metrics, setMetrics] = useState<any>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [scoreData, setScoreData] = useState<{ buckets: ScoreBucket[]; mean: string; median: string } | null>(null);
+  const [conversionData, setConversionData] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -73,15 +74,17 @@ export default function OverviewPage() {
 
       // Only attempt to load pipeline metrics if the user is integrated into a team
       if (userRes.user?.teamId) {
-        const [metricsRes, appsRes, scoreRes] = await Promise.all([
+        const [metricsRes, appsRes, scoreRes, conversionRes] = await Promise.all([
           getMetricsOverview(),
           getApplications(1, 10),
-          getScoreDistribution()
+          getScoreDistribution(),
+          getConversion()
         ]);
         
         setMetrics(metricsRes);
         setApplications(appsRes.data || []);
         setScoreData(scoreRes);
+        setConversionData(conversionRes.data || []);
       }
     } catch (err: any) {
       console.error("Failed to fetch overview metrics:", err);
@@ -404,88 +407,162 @@ export default function OverviewPage() {
       {/* Main Grid: Analytical Chart & Recent Screening Activities Table */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
         
-        {/* Left Column: AI Compatibility Score Distribution Card */}
-        <Card className="lg:col-span-1 border border-border/40 bg-card/60 backdrop-blur-sm flex flex-col justify-between shadow-sm">
-          <CardHeader className="pb-2">
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle className="text-lg font-bold">Score Distribution</CardTitle>
-                <CardDescription className="text-xs">
-                  Candidate semantic alignment index counts
-                </CardDescription>
-              </div>
-              <span className="bg-primary/10 text-primary border border-primary/20 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                gpt-4o-mini
-              </span>
-            </div>
-          </CardHeader>
+        {/* Left Column Stack */}
+        <div className="lg:col-span-1 flex flex-col gap-6">
           
-          <CardContent className="pt-4 flex-grow flex flex-col justify-between min-h-[220px]">
-            {scoreData && scoreData.buckets?.length > 0 ? (
-              <div className="space-y-6 flex-grow flex flex-col justify-between">
-                {/* SVG/CSS Bar Chart Grid */}
-                <div className="h-44 flex items-end gap-1.5 pt-4 px-2 relative border-b border-border/40">
-                  {/* Decorative horizontal guidelines */}
-                  <div className="absolute inset-x-0 top-1/4 border-t border-border/10 border-dashed pointer-events-none" />
-                  <div className="absolute inset-x-0 top-2/4 border-t border-border/10 border-dashed pointer-events-none" />
-                  <div className="absolute inset-x-0 top-3/4 border-t border-border/10 border-dashed pointer-events-none" />
-                  
-                  {(() => {
-                    const counts = scoreData.buckets.map(b => b.count);
-                    const maxVal = Math.max(...counts, 1);
+          {/* Card 1: AI Compatibility Score Distribution Card */}
+          <Card className="border border-border/40 bg-card/60 backdrop-blur-sm flex flex-col justify-between shadow-sm">
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-lg font-bold">Score Distribution</CardTitle>
+                  <CardDescription className="text-xs">
+                    Candidate semantic alignment index counts
+                  </CardDescription>
+                </div>
+                <span className="bg-primary/10 text-primary border border-primary/20 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                  gpt-4o-mini
+                </span>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="pt-4 flex-grow flex flex-col justify-between min-h-[220px]">
+              {scoreData && scoreData.buckets?.length > 0 ? (
+                <div className="space-y-6 flex-grow flex flex-col justify-between">
+                  {/* SVG/CSS Bar Chart Grid */}
+                  <div className="h-44 flex items-end gap-1.5 pt-4 px-2 relative border-b border-border/40">
+                    {/* Decorative horizontal guidelines */}
+                    <div className="absolute inset-x-0 top-1/4 border-t border-border/10 border-dashed pointer-events-none" />
+                    <div className="absolute inset-x-0 top-2/4 border-t border-border/10 border-dashed pointer-events-none" />
+                    <div className="absolute inset-x-0 top-3/4 border-t border-border/10 border-dashed pointer-events-none" />
                     
-                    return scoreData.buckets.map((b) => {
-                      const percentage = (b.count / maxVal) * 100;
-                      return (
-                        <div key={b.range} className="flex flex-col items-center flex-1 h-full justify-end group relative cursor-help">
-                          {/* Hover tooltip bubble */}
-                          <span className="text-[10px] select-none font-bold text-foreground bg-popover border border-border px-2 py-1 rounded shadow-lg absolute -top-8 scale-0 group-hover:scale-100 transition-all z-10 whitespace-nowrap pointer-events-none">
-                            {b.count} {b.count === 1 ? "applicant" : "applicants"}
-                          </span>
-                          {/* Animated Vertical Bar */}
-                          <div 
-                            style={{ height: `${percentage}%` }}
-                            className="w-full bg-[#adc6ff]/20 hover:bg-[#adc6ff] border-t border-[#adc6ff]/50 rounded-t-sm transition-all duration-300 relative overflow-hidden"
-                          >
-                            <div className="absolute inset-0 bg-gradient-to-t from-transparent to-[#adc6ff]/10 animate-pulse group-hover:opacity-0" />
+                    {(() => {
+                      const counts = scoreData.buckets.map(b => b.count);
+                      const maxVal = Math.max(...counts, 1);
+                      
+                      return scoreData.buckets.map((b) => {
+                        const percentage = (b.count / maxVal) * 100;
+                        return (
+                          <div key={b.range} className="flex flex-col items-center flex-1 h-full justify-end group relative cursor-help">
+                            {/* Hover tooltip bubble */}
+                            <span className="text-[10px] select-none font-bold text-foreground bg-popover border border-border px-2 py-1 rounded shadow-lg absolute -top-8 scale-0 group-hover:scale-100 transition-all z-10 whitespace-nowrap pointer-events-none">
+                              {b.count} {b.count === 1 ? "applicant" : "applicants"}
+                            </span>
+                            {/* Animated Vertical Bar */}
+                            <div 
+                              style={{ height: `${percentage}%` }}
+                              className="w-full bg-[#adc6ff]/20 hover:bg-[#adc6ff] border-t border-[#adc6ff]/50 rounded-t-sm transition-all duration-300 relative overflow-hidden"
+                            >
+                              <div className="absolute inset-0 bg-gradient-to-t from-transparent to-[#adc6ff]/10 animate-pulse group-hover:opacity-0" />
+                            </div>
+                            {/* X-Axis Range Marker */}
+                            <span className="text-[9px] text-muted-foreground mt-2 truncate w-full text-center font-medium leading-none select-none">
+                              {b.range}
+                            </span>
                           </div>
-                          {/* X-Axis Range Marker */}
-                          <span className="text-[9px] text-muted-foreground mt-2 truncate w-full text-center font-medium leading-none select-none">
-                            {b.range}
-                          </span>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-
-                {/* Score Stats Detail Summary */}
-                <div className="grid grid-cols-2 gap-4 border-t border-border/20 pt-4 bg-muted/20 rounded-lg p-3">
-                  <div className="text-center space-y-0.5">
-                    <span className="text-xs text-muted-foreground font-semibold">Mean score</span>
-                    <p className="text-lg font-black text-foreground">{scoreData.mean}%</p>
+                        );
+                      });
+                    })()}
                   </div>
-                  <div className="text-center space-y-0.5">
-                    <span className="text-xs text-muted-foreground font-semibold">Median score</span>
-                    <p className="text-lg font-black text-foreground">{scoreData.median}%</p>
+   
+                  {/* Score Stats Detail Summary */}
+                  <div className="grid grid-cols-2 gap-4 border-t border-border/20 pt-4 bg-muted/20 rounded-lg p-3">
+                    <div className="text-center space-y-0.5">
+                      <span className="text-xs text-muted-foreground font-semibold">Mean score</span>
+                      <p className="text-lg font-black text-foreground">{scoreData.mean}%</p>
+                    </div>
+                    <div className="text-center space-y-0.5">
+                      <span className="text-xs text-muted-foreground font-semibold">Median score</span>
+                      <p className="text-lg font-black text-foreground">{scoreData.median}%</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center p-6 text-muted-foreground/60 space-y-2">
-                <Clock className="h-8 w-8 opacity-40 animate-pulse" />
-                <p className="text-xs">Gathering compatibility matching score samples...</p>
-              </div>
-            )}
-          </CardContent>
-          
-          <CardFooter className="border-t border-border/20 py-3.5 bg-muted/10 text-center flex justify-center">
-            <span className="text-xs text-muted-foreground font-medium">
-              Data calibrated against live candidate database
-            </span>
-          </CardFooter>
-        </Card>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center p-6 text-muted-foreground/60 space-y-2">
+                  <Clock className="h-8 w-8 opacity-40 animate-pulse" />
+                  <p className="text-xs">Gathering compatibility matching score samples...</p>
+                </div>
+              )}
+            </CardContent>
+            
+            <CardFooter className="border-t border-border/20 py-3.5 bg-muted/10 text-center flex justify-center">
+              <span className="text-xs text-muted-foreground font-medium">
+                Data calibrated against live candidate database
+              </span>
+            </CardFooter>
+          </Card>
 
+          {/* Card 2: Pipeline Stage Volume */}
+          <Card className="border border-border/40 bg-card/60 backdrop-blur-sm shadow-sm flex flex-col justify-between">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-bold">Pipeline Stage Volume</CardTitle>
+              <CardDescription className="text-xs">
+                Relative candidate counts in each screening stage
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-2 pb-6 space-y-4">
+              {(() => {
+                const stageCounts: Record<string, number> = {
+                  SUBMITTED: 0,
+                  PROCESSING: 0,
+                  REVIEWED: 0,
+                  SHORTLISTED: 0,
+                  REJECTED: 0,
+                };
+
+                conversionData.forEach((item) => {
+                  const stage = item.stage;
+                  if (stage === "SCORING" || stage === "PROCESSING") {
+                    stageCounts.PROCESSING += item.count;
+                  } else if (stageCounts[stage] !== undefined) {
+                    stageCounts[stage] += item.count;
+                  }
+                });
+
+                const totalInPipeline = Object.values(stageCounts).reduce((a, b) => a + b, 0) || 1;
+
+                const stageLabels: Record<string, string> = {
+                  SUBMITTED: "Intake / New",
+                  PROCESSING: "AI Parsing & Scoring",
+                  REVIEWED: "Screened / Pending",
+                  SHORTLISTED: "Shortlisted",
+                  REJECTED: "Rejected",
+                };
+
+                const stageColors: Record<string, string> = {
+                  SUBMITTED: "bg-blue-500/80 border-blue-400/30",
+                  PROCESSING: "bg-amber-500/80 border-amber-400/30",
+                  REVIEWED: "bg-indigo-500/80 border-indigo-400/30",
+                  SHORTLISTED: "bg-emerald-500/80 border-emerald-400/30",
+                  REJECTED: "bg-rose-500/80 border-rose-400/30",
+                };
+
+                return Object.entries(stageCounts).map(([stage, count]) => {
+                  const percentage = (count / totalInPipeline) * 100;
+                  const label = stageLabels[stage] || stage;
+                  const colorClass = stageColors[stage] || "bg-primary";
+
+                  return (
+                    <div key={stage} className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span className="text-muted-foreground">{label}</span>
+                        <span className="text-foreground">{count} {count === 1 ? "candidate" : "candidates"}</span>
+                      </div>
+                      <div className="h-2 w-full bg-muted/40 rounded-full overflow-hidden border border-border/20">
+                        <div 
+                          style={{ width: `${percentage}%` }}
+                          className={`h-full rounded-full transition-all duration-500 ${colorClass}`}
+                        />
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </CardContent>
+          </Card>
+
+        </div>
+ 
         {/* Right Column: Latest Applications Queue Feed Table */}
         <Card className="lg:col-span-2 border border-border/40 bg-card/60 backdrop-blur-sm shadow-sm flex flex-col justify-between">
           <CardHeader className="pb-3">
@@ -528,7 +605,7 @@ export default function OverviewPage() {
                           scoreBgClass = "bg-rose-500/10 border-rose-500/20";
                         }
                       }
-
+ 
                       return (
                         <tr 
                           key={app.id} 

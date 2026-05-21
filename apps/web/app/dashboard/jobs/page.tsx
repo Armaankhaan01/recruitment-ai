@@ -17,6 +17,7 @@ interface Job {
   id: string;
   title: string;
   description: string;
+  location?: string | null;
   status: string;
   seniorityLevel: string;
   skillRequirements: any;
@@ -229,11 +230,15 @@ export default function JobsPage() {
                           <p className="font-bold text-sm text-foreground group-hover:text-[#adc6ff] transition-colors">
                             {job.title}
                           </p>
-                          {job.salaryRangeMin && job.salaryRangeMax && (
-                            <p className="text-[10px] text-muted-foreground font-semibold">
-                              Est. Compensation: ${Number(job.salaryRangeMin).toLocaleString()} - ${Number(job.salaryRangeMax).toLocaleString()}
-                            </p>
-                          )}
+                          <div className="flex flex-wrap items-center gap-x-2 text-[10px] text-muted-foreground font-semibold">
+                            {job.salaryRangeMin && job.salaryRangeMax && (
+                              <span>
+                                Est. Compensation: ${Number(job.salaryRangeMin).toLocaleString()} - ${Number(job.salaryRangeMax).toLocaleString()}
+                              </span>
+                            )}
+                            {job.salaryRangeMin && job.salaryRangeMax && <span>•</span>}
+                            <span>{job.location || "Remote"}</span>
+                          </div>
                         </div>
                       </TableCell>
 

@@ -263,14 +263,14 @@ export default function ApplyPage({ params }: { params: Promise<{ id: string }> 
               </div>
 
               <div className="relative border-2 border-dashed border-border/80 hover:border-primary/50 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer bg-background/50 hover:bg-primary/5 transition-all duration-200">
-                <Input
+                <input
                   id="resume"
                   name="resume"
                   type="file"
                   accept=".pdf,.docx"
                   required
                   onChange={handleFileChange}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
                 <UploadCloud className="h-10 w-10 text-muted-foreground/80 mb-3" />
                 <span className="text-sm font-semibold text-foreground">

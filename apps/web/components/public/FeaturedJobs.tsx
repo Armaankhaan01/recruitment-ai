@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { listPublicJobs } from "@/lib/api/jobs";
-import Link from "next/link";
-import { Briefcase, MapPin, DollarSign, Search, Loader2, Sparkles, ChevronRight, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Briefcase, Search, Loader2, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import JobCard from "./JobCard";
+import JobDetailsDialog from "./JobDetailsDialog";
 
 interface Job {
   id: string;
   title: string;
   description: string;
+  location?: string | null;
   seniorityLevel: string;
   status: string;
   publishedAt: string;
@@ -34,6 +34,14 @@ export default function FeaturedJobs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const jobsPerPage = 6;
+
+  // Dialog State
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   // Local applications loaded from localStorage
   const [appliedJobs, setAppliedJobs] = useState<Record<string, LocalApplication>>({});
@@ -50,7 +58,6 @@ export default function FeaturedJobs() {
   };
 
   useEffect(() => {
-    // 1. Fetch public jobs
     listPublicJobs()
       .then((res) => {
         setJobs(res.data || []);
@@ -62,7 +69,6 @@ export default function FeaturedJobs() {
         setLoading(false);
       });
 
-    // 2. Load initial applied jobs from localStorage
     loadLocalApplications();
   }, []);
 
@@ -103,11 +109,24 @@ export default function FeaturedJobs() {
     }
   }, [loading]);
 
+  // Reset page when search query changes
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setCurrentPage(1);
+  };
+
   const filteredJobs = jobs.filter(
     (job) =>
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.skillRequirements.some((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  // Paginated Jobs calculations
+  const totalPages = Math.ceil(filteredJobs.length / jobsPerPage);
+  const paginatedJobs = filteredJobs.slice(
+    (currentPage - 1) * jobsPerPage,
+    currentPage * jobsPerPage
   );
 
   const formatSalary = (min: number | null, max: number | null) => {
@@ -138,6 +157,11 @@ export default function FeaturedJobs() {
     }
   };
 
+  const handleOpenDetails = (job: Job) => {
+    setSelectedJob(job);
+    setIsDetailsOpen(true);
+  };
+
   return (
     <section id="featured-opportunities" className="w-full px-gutter py-20 max-w-container-max mx-auto space-y-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-border/40 pb-6">
@@ -156,7 +180,7 @@ export default function FeaturedJobs() {
           <Input
             placeholder="Search roles or skills…"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-9 pr-4 h-10 border-border/60 bg-card focus-visible:ring-primary shadow-sm"
           />
         </div>
@@ -182,102 +206,84 @@ export default function FeaturedJobs() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-3 max-w-5xl mx-auto">
-          {filteredJobs.map((job) => {
-            const hasApplied = appliedJobs[job.id] !== undefined;
-            const appStatus = hasApplied ? mapStatus(appliedJobs[job.id].status) : null;
+        <div className="space-y-10">
+          <div className="grid gap-6 md:grid-cols-3 max-w-5xl mx-auto">
+            {paginatedJobs.map((job) => {
+              const hasApplied = appliedJobs[job.id] !== undefined;
+              const appStatus = hasApplied ? mapStatus(appliedJobs[job.id].status) : null;
 
-            return (
-              <Card
-                key={job.id}
-                className="bg-card border-border/40 hover:border-primary/30 hover:shadow-md transition-all duration-300 flex flex-col justify-between overflow-hidden shadow-sm group"
+              return (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  hasApplied={hasApplied}
+                  appStatus={appStatus}
+                  formatSalary={formatSalary}
+                  onViewDetails={handleOpenDetails}
+                />
+              );
+            })}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="h-9 px-3 border-border/60 text-xs font-bold gap-1 uppercase tracking-wider disabled:opacity-50"
               >
-                <CardHeader className="pb-4">
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="bg-muted p-2.5 rounded-lg border border-border/40 group-hover:scale-105 transition-transform duration-300 shadow-sm">
-                      <Briefcase className="h-5 w-5 text-primary" />
-                    </div>
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              
+              <div className="flex items-center gap-1.5">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className={`h-9 w-9 text-xs font-bold ${
+                      currentPage === page 
+                        ? "bg-primary text-primary-foreground font-black" 
+                        : "border-border/60 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {page}
+                  </Button>
+                ))}
+              </div>
 
-                    {hasApplied && appStatus ? (
-                      <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded border shadow-inner ${appStatus.color}`}>
-                        {appStatus.text}
-                      </span>
-                    ) : (
-                      <span className="bg-primary/5 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider">
-                        Open Role
-                      </span>
-                    )}
-                  </div>
-
-                  <CardTitle className="text-xl font-bold tracking-tight text-foreground mt-4 line-clamp-1 group-hover:text-primary transition-colors">
-                    {job.title}
-                  </CardTitle>
-
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mt-2 font-medium">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3.5 w-3.5" />
-                      Remote / Hybrid
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <DollarSign className="h-3.5 w-3.5" />
-                      {formatSalary(job.salaryRangeMin, job.salaryRangeMax)}
-                    </span>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="flex-1 flex flex-col justify-between pt-0">
-                  <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed mb-6">
-                    {job.description}
-                  </p>
-
-                  <div className="space-y-6">
-                    {/* Skills badges */}
-                    {job.skillRequirements?.length > 0 && (
-                      <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                          Skills Requirements
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {job.skillRequirements.slice(0, 3).map((skill, idx) => (
-                            <Badge
-                              key={idx}
-                              variant={skill.required ? "default" : "secondary"}
-                              className="text-[10px] px-2 py-0.5"
-                            >
-                              {skill.name} ({skill.minYears}y)
-                            </Badge>
-                          ))}
-                          {job.skillRequirements.length > 3 && (
-                            <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-dashed">
-                              +{job.skillRequirements.length - 3} more
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="pt-2 border-t border-border/40">
-                      {hasApplied && appStatus ? (
-                        <div className="text-center py-2.5 rounded-lg border border-dashed border-border/80 bg-background/50 text-xs font-medium text-muted-foreground">
-                          Application Pending Review
-                        </div>
-                      ) : (
-                        <Link href={`/jobs/${job.id}/apply`} className="w-full">
-                          <Button
-                            className="w-full h-10 bg-[#adc6ff] hover:bg-[#adc6ff]/90 text-[#002e6a] font-black uppercase tracking-wider text-xs shadow-sm cursor-pointer transition-all duration-200"
-                          >
-                            Apply Now
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, Math.min(totalPages, p + 1)))}
+                disabled={currentPage === totalPages}
+                className="h-9 px-3 border-border/60 text-xs font-bold gap-1 uppercase tracking-wider disabled:opacity-50"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Modal Dialog Details Viewer */}
+      <JobDetailsDialog
+        job={selectedJob}
+        isOpen={isDetailsOpen}
+        onClose={() => {
+          setIsDetailsOpen(false);
+          setSelectedJob(null);
+        }}
+        hasApplied={selectedJob ? appliedJobs[selectedJob.id] !== undefined : false}
+        appStatus={selectedJob && appliedJobs[selectedJob.id] ? mapStatus(appliedJobs[selectedJob.id].status) : null}
+        formatSalary={formatSalary}
+      />
     </section>
   );
 }
